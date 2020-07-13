@@ -18,8 +18,9 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
   "display": "standalone",
+  "scope": "/",
+  "start_url": "https://tp-kraken.herokuapp.com/",
   "theme_color": "#000000",
   "background_color": "#ffffff"
 }

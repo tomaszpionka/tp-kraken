@@ -3,41 +3,56 @@ const urlsToCache = ["index.html", "offline.html"];
 
 const self = this;
 
-// install sw
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log("Opened cache");
-      return cache.addAll(urlsToCache);
-    })
-  );
+self.addEventListener("install", function (event) {
+  event.waitUntil(preLoad());
 });
 
-// listen for requests
-self.addEventListener("fetch", (event) => {
+var preLoad = function () {
+  console.log("Installing web app");
+  return caches.open("offline").then(function (cache) {
+    console.log("caching index and important routes");
+    return cache.addAll(["/offline.html"]);
+  });
+};
+
+self.addEventListener("fetch", function (event) {
   event.respondWith(
-    caches.match(event.request).then(() => {
-      return fetch(event.request).catch(() => {
-        caches.match("offline.html");
-      });
+    checkResponse(event.request).catch(function () {
+      return returnFromCache(event.request);
     })
   );
+  event.waitUntil(addToCache(event.request));
 });
 
-// activate the sw
-self.addEventListener("activate", (event) => {
-  const cacheWhitelist = [];
-  cacheWhitelist.push(CACHE_NAME);
+var checkResponse = function (request) {
+  return new Promise(function (fulfill, reject) {
+    fetch(request).then(function (response) {
+      if (response.status !== 404) {
+        fulfill(response);
+      } else {
+        reject();
+      }
+    }, reject);
+  });
+};
 
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      Promise.all(
-        cacheNames.map((cacheName) => {
-          if (!cacheWhitelist.includes(cacheName)) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-});
+var addToCache = function (request) {
+  return caches.open("offline").then(function (cache) {
+    return fetch(request).then(function (response) {
+      console.log(response.url + " was cached");
+      return cache.put(request, response);
+    });
+  });
+};
+
+var returnFromCache = function (request) {
+  return caches.open("offline").then(function (cache) {
+    return cache.match(request).then(function (matching) {
+      if (!matching || matching.status == 404) {
+        return cache.match("offline.html");
+      } else {
+        return matching;
+      }
+    });
+  });
+};
